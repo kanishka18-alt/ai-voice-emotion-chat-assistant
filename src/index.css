@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* AI Chat Theme - Modern Blues & Purples */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary - Electric Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 217 91% 70%;
+
+    /* Secondary - Deep Purple */
+    --secondary: 263 70% 50%;
+    --secondary-foreground: 0 0% 98%;
+
+    /* Muted - Dark Grays */
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 65%;
+
+    /* Accent - Bright Purple */
+    --accent: 270 95% 75%;
+    --accent-foreground: 240 10% 3.9%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5% 20%;
+    --input: 240 5% 15%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Chat-specific colors */
+    --chat-sidebar: 240 8% 8%;
+    --chat-user-message: 217 91% 60%;
+    --chat-bot-message: 240 5% 15%;
+    --chat-input: 240 5% 12%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(263 70% 50%) 100%);
+    --gradient-message: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(217 91% 70%) 100%);
+    --gradient-glow: linear-gradient(135deg, hsl(217 91% 60% / 0.1) 0%, hsl(263 70% 50% / 0.1) 100%);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsl(217 91% 60% / 0.3);
+    --shadow-message: 0 2px 10px hsl(0 0% 0% / 0.1);
+    --shadow-sidebar: 2px 0 20px hsl(0 0% 0% / 0.1);
+
+    /* Sidebar colors (unused in this dark theme) */
+    --sidebar-background: 240 8% 8%;
+    --sidebar-foreground: 240 5% 65%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 5% 15%;
+    --sidebar-accent-foreground: 240 5% 65%;
+    --sidebar-border: 240 5% 20%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  .dark {
+    /* Keep same colors since we're using dark theme globally */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

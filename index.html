@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thera-Pal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        /* Soothing Palette Change */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f7fbf8; /* Very pale minty green-blue */
+        }
+        /* Chat window uses flex-grow to take up available vertical space */
+        #chat-window { 
+            overflow-y: auto; 
+            min-height: 0; 
+        }
+        .user-message { 
+            background-color: #6b8e88; /* Muted Teal/Blue-Green for user */
+            color: white; 
+            border-radius: 12px 12px 2px 12px; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .bot-message { 
+            background-color: #ffffff; 
+            color: #1f2937; 
+            border-radius: 12px 12px 12px 2px; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08); 
+        }
+        .recording-active { 
+            animation: pulse-record 1.5s infinite; 
+            box-shadow: 0 0 10px #f43f5e; /* Softer Rose Glow */
+        }
+        @keyframes pulse-record { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    </style>
+</head>
+<body class="w-screen h-screen m-0 p-0 overflow-hidden">
+
+    <!-- Main Container now takes up the entire screen -->
+    <div class="w-full h-full bg-white flex flex-col p-6 md:p-10 shadow-inner">
+        <header class="text-center mb-6 border-b pb-4 border-gray-100">
+            <!-- Header color changed to Teal-700 -->
+            <h1 class="text-4xl font-extrabold text-teal-700">Thera-Pal : Your AI Friend 🌸</h1>
+            <p class="text-md text-gray-500 mt-2">Speak, type, share your feelings—I'm here to listen.</p>
+        </header>
+        
+        <!-- Chat Window - flex-grow ensures it fills the height -->
+        <div id="chat-window" class="flex-grow space-y-4 p-4 mb-4 bg-white rounded-lg border border-gray-100 shadow-inner">
+            <div class="flex justify-start">
+                <div class="bot-message p-3 max-w-sm">
+                    Hey! I'm here to listen. Tell me what's going on! You can type or **hold the mic to speak** about your day!
+                </div>
+            </div>
+        </div>
+
+        <!-- Status & Controls -->
+        <div id="status-area" class="text-sm text-center font-medium text-gray-600 mb-4 h-4"></div>
+        
+        <div class="flex space-x-3 items-center">
+            <!-- Text Input -->
+            <!-- Focus ring changed to soft teal -->
+            <input type="text" id="user-input" placeholder="Type your message..."
+                    class="flex-grow p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-teal-200 transition duration-150 text-gray-700">
+            
+            <!-- Send Button color changed to Teal-600 -->
+            <button id="send-btn" class="p-4 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition duration-150 shadow-lg w-24">
+                Send
+            </button>
+            
+            <!-- Record Button color changed to Rose-500 -->
+            <button id="record-btn" class="p-4 bg-rose-500 text-white rounded-full hover:bg-rose-600 transition duration-150 shadow-lg flex items-center justify-center w-14 h-14 text-2xl">
+                🎤
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const recordBtn = document.getElementById('record-btn');
+        const statusArea = document.getElementById('status-area');
+        // This URL is set to talk to the Node.js server provided (server.js)
+        const SERVER_URL = 'http://localhost:3000/api/chat'; 
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let lastUserMessageElement = null; // Stores the <div> element for the last voice message
+
+        // --- UI Functions ---
+
+        /**
+         * Displays a message in the chat window.
+         * @returns {HTMLElement} The content <div> element for potential later updates (like transcription).
+         */
+        function displayMessage(text, sender, emotion = null) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
+            
+            const content = document.createElement('div');
+            // Max width adjusted for better mobile view in a full-screen app
+            content.classList.add('p-3', 'max-w-[70%]', sender === 'user' ? 'user-message' : 'bot-message'); 
+            
+            if (emotion && sender === 'bot') {
+                // Emotion color changed to Teal-500
+                content.innerHTML = `<span class="font-bold text-sm block mb-1 text-teal-500">Emotion: ${emotion}</span>${text}`;
+            } else {
+                content.textContent = text;
+            }
+
+            messageElement.appendChild(content);
+            chatWindow.appendChild(messageElement);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll to bottom
+            return content; // Return the content div
+        }
+
+        function setStatus(text, color = 'text-gray-600') {
+            statusArea.className = `text-sm text-center font-medium mb-4 h-4 ${color}`;
+            statusArea.textContent = text;
+        }
+
+        function setControls(disabled) {
+            userInput.disabled = disabled;
+            sendBtn.disabled = disabled;
+            // Only disable the record button if it's not currently recording (to allow stopping)
+            if (!isRecording) {
+                recordBtn.disabled = disabled;
+            }
+        }
+
+
+        // --- Audio Recording Functions ---
+
+        async function startRecording(e) {
+            // Prevent default behavior (like text selection or context menu on mobile)
+            if (e) e.preventDefault(); 
+
+            try {
+                // Check if already recording to prevent double-tap issues
+                if (isRecording) return;
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    sendAudioToServer(audioBlob);
+                    // Stop tracks on the stream to release mic access
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('recording-active');
+                // Darker Rose color on active
+                recordBtn.style.backgroundColor = '#c02b48'; 
+                // Status color changed to Rose-600
+                setStatus('Recording... Release the mic button to send.', 'text-rose-600');
+
+                // Auto-stop after 10 seconds
+                setTimeout(() => {
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                }, 10000); // 10 seconds max recording
+            } catch (err) {
+                setStatus('Error accessing microphone. Check permissions.', 'text-rose-600');
+                console.error('Could not start recording:', err);
+                // Ensure controls are re-enabled on failure
+                setControls(false); 
+            }
+        }
+
+        function stopRecording() {
+            if (isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.classList.remove('recording-active');
+                // Standard Rose color on stop
+                recordBtn.style.backgroundColor = '#f43f5e'; 
+                setStatus('Sending voice message and analyzing emotion...');
+                setControls(true);
+            }
+        }
+
+        // Use touch and mouse events for holding the button
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('touchstart', startRecording);
+        recordBtn.addEventListener('touchend', stopRecording);
+        
+        // Prevents context menu on long press on mobile
+        recordBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+
+        // --- API Call and Send Logic ---
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    // Extract only the Base64 part (after "data:audio/webm;base64,")
+                    const base64Data = reader.result.split(',')[1];
+                    resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function sendAudioToServer(audioBlob) {
+            // Display a temporary message for the user's voice note
+            const tempMessage = `(Processing voice note: ${Math.round(audioBlob.size / 1024)} KB)`;
+            lastUserMessageElement = displayMessage(tempMessage, 'user');
+
+            try {
+                const base64Audio = await blobToBase64(audioBlob);
+
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        audio_data: base64Audio,
+                        audio_mime_type: audioBlob.type 
+                    })
+                });
+
+                await handleApiResponse(response);
+
+            } catch (error) {
+                setStatus(`Voice processing failed: ${error.message}`, 'text-rose-600');
+                console.error("Voice processing error:", error);
+            } finally {
+                setControls(false);
+            }
+        }
+
+        async function sendTextToServer(message) {
+            if (!message.trim()) return;
+            displayMessage(message, 'user');
+            userInput.value = '';
+            setControls(true);
+            setStatus('Thinking...');
+
+            try {
+                // Clear the voice message element reference as this is text input
+                lastUserMessageElement = null; 
+                
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                await handleApiResponse(response);
+
+            } catch (error) {
+                setStatus(`Network Error: ${error.message}`, 'text-rose-600');
+                console.error("Network Error:", error);
+            } finally {
+                setControls(false);
+            }
+        }
+        
+        async function handleApiResponse(response) {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ response: `Server returned status ${response.status}` }));
+                throw new Error(errorData.response || `API failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.emotion && data.response) {
+                // 1. If it was a voice message, update the user's message bubble with the transcription
+                if (data.user_transcription && lastUserMessageElement) {
+                    lastUserMessageElement.textContent = data.user_transcription;
+                    lastUserMessageElement = null; // Reset the reference
+                }
+                
+                // 2. Display the bot's emotional response
+                displayMessage(data.response, 'bot', data.emotion);
+                setStatus('Ready to listen!');
+            } else {
+                 throw new Error("Invalid response format from server.");
+            }
+        }
+
+
+        // --- Event Listeners ---
+
+        sendBtn.addEventListener('click', () => sendTextToServer(userInput.value));
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTextToServer(userInput.value);
+            }
+        });
+        
+        setStatus('Ready to listen!');
+
+    </script>
+</body>
+</html>
