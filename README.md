@@ -27,8 +27,9 @@ public/ – Static assets
 Create a `.env` file in the root directory and add:
 GEMINI_API_KEY=your_api_key_here
 
-**Note:** The API key used for this project is valid for only **3 months**.
-If the key expires, generate a new key from the Gemini API dashboard and update the `.env` file.
+**Note:**  
+This project uses the **Google Gemini API**. The API key used during development was from the **free tier**, which is valid for **3 months**.  
+If the key expires, you will need to generate a new key. Depending on availability, generating a new key may require enabling billing on the Google Cloud account.
 
 ## Author
 Kanishka Sharma  
